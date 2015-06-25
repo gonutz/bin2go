@@ -35,54 +35,90 @@ import (
 )
 
 var (
-	pkgName  = flag.String("p", "main", "Package name")
-	lineLen  = flag.Int("l", 8, "Line length")
-	comment  = flag.Bool("c", false, "Line comments")
-	useArray = flag.Bool("a", false, "Use slice ([]byte) instead of array ([...]byte)")
-	single   = flag.String("s", "", "Single output filename")
+	packageName  = flag.String("p", "main", "Package name.")
+	bytesPerLine = flag.Int("l", 8, "Number of bytes per line.")
+	writeComment = flag.Bool("c", false, "Add the bytes as text as line comments.")
+	useSlice     = flag.Bool("s", false, "Use slice ([]byte) instead of array ([...]byte)")
+	variableName = flag.String("v", "", "Variable name to use. If empty, the name"+
+		" is generated from the file name.")
+	outputFileName = flag.String("o", "", "Output file path. This is only used"+
+		" if there is just one file to be converted.")
 )
 
-func bin2go(ifile, pkgName, bufName string, ofi *os.File, line int, comment, useArray, useSingle bool) error {
-	ifi, err := os.Open(ifile)
-	if err != nil {
-		return err
-	}
-	defer ifi.Close()
-
-	buffer := make([]byte, line)
-
-	size := "..."
-	if useArray {
-		size = ""
+func main() {
+	flag.Parse()
+	if len(flag.Args()) == 0 {
+		// no files were given so tell the user how to use this program
+		flag.Usage()
+		return
 	}
 
-	if !useSingle {
-		writeHeader(ofi)
-	}
+	for _, fileName := range flag.Args() {
+		inputFile, err := os.Open(fileName)
+		if err != nil {
+			fmt.Println(err)
+			continue
+		}
+		defer inputFile.Close()
 
-	fmt.Fprintf(ofi, "\nvar %s = [%s]byte{\n", bufName, size)
+		outputFile, err := os.Create(makeOutputFileName(fileName))
+		if err != nil {
+			fmt.Println(err)
+			continue
+		}
+		defer outputFile.Close()
+
+		varName := *variableName
+		if len(varName) == 0 {
+			varName = camelCase(fileName)
+		}
+		if err = bin2go(inputFile, outputFile, varName); err != nil {
+			fmt.Println(err)
+		}
+	}
+}
+
+func makeOutputFileName(fileName string) string {
+	if len(*outputFileName) > 0 && len(flag.Args()) == 1 {
+		name := *outputFileName
+		if !strings.HasSuffix(name, ".go") {
+			name += ".go"
+		}
+		return name
+	}
+	return fileName + ".go"
+}
+
+func bin2go(inputFile, outputFile *os.File, variableName string) error {
+	buffer := make([]byte, *bytesPerLine)
+	varType := "[...]byte"
+	if *useSlice {
+		varType = "[]byte"
+	}
+	fmt.Fprintf(outputFile, "package %s\n", *packageName)
+	fmt.Fprintf(outputFile, "\nvar %s = %s{\n", variableName, varType)
 	for {
-		nRead, err := ifi.Read(buffer)
+		nRead, err := inputFile.Read(buffer)
 		if err == io.EOF {
 			break
 		} else if err != nil {
 			return err
 		}
-		fmt.Fprintf(ofi, "\t%0#2x,", buffer[0])
+		fmt.Fprintf(outputFile, "\t%0#2x,", buffer[0])
 		for _, c := range buffer[1:nRead] {
-			fmt.Fprintf(ofi, " %0#2x,", c)
+			fmt.Fprintf(outputFile, " %0#2x,", c)
 		}
-		if comment {
-			fmt.Fprintf(ofi, "\t// %s", clean(string(buffer)))
+		if *writeComment {
+			fmt.Fprintf(outputFile, "\t// %s",
+				removeNonDisplayableRunes(string(buffer)))
 		}
-		fmt.Fprint(ofi, "\n")
+		fmt.Fprint(outputFile, "\n")
 	}
-	fmt.Fprint(ofi, "}\n")
-
+	fmt.Fprint(outputFile, "}\n")
 	return nil
 }
 
-func clean(s string) string {
+func removeNonDisplayableRunes(s string) string {
 	return strings.Map(func(r rune) rune {
 		if unicode.IsLetter(r) || unicode.IsDigit(r) {
 			return r
@@ -113,36 +149,4 @@ func camelCase(s string) string {
 
 		return -1
 	}, s)
-}
-
-func main() {
-	flag.Parse()
-
-	var ofi *os.File
-	var err error
-	var useSingle = *single != ""
-	if useSingle {
-		if ofi, err = os.Create(*single); err != nil {
-			return
-		}
-		defer ofi.Close()
-
-		writeHeader(ofi)
-	}
-
-	for _, fileName := range flag.Args() {
-		if !useSingle {
-			if ofi, err = os.Create(fileName + ".go"); err != nil {
-				return
-			}
-			defer ofi.Close()
-		}
-
-		bin2go(fileName, *pkgName, camelCase(fileName), ofi, *lineLen, *comment, *useArray, useSingle)
-	}
-}
-
-func writeHeader(f *os.File) {
-	fmt.Fprintf(f, "// Automatically generated with bin2go: http://github.com/chsc/bin2go\n\n")
-	fmt.Fprintf(f, "package %s\n", *pkgName)
 }

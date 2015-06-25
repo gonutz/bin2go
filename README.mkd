@@ -6,4 +6,14 @@ Converts binary files to go source code.
 Usage
 -----
 
-	bin2go [-p <package name>] [-l <bytes per line>] [-c] [-a] [-s <single_file.go>] <file 1> <file 2> ...
+	bin2go [-p <package>] [-l <bytes per line>] [-c] [-s] [-v <variable>] [-o <output file>] <file 1> <file 2> ...
+
+Options:
+
+	-p: package name used in the Go file(s)
+	-l: bytes per line
+	-c: add comments to the end of each line, they are the bytes as characters
+	-s: use a slice ([]byte) instead of an array ([...]byte)
+	-v: variable name in the Go file(s)
+	-o: output file, this is only used if there is exactly one input file,
+	    otherwise the output file names are generated from the input file names
