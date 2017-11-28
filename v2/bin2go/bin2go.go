@@ -26,7 +26,7 @@ func main() {
 `, *packageName)
 	}
 
-	fmt.Printf(`var %s = [...]byte{`, *varName)
+	fmt.Printf(`var %s = []byte{`, *varName)
 
 	n, err := io.Copy(&generator{bytesInLine: maxBytesInLine}, os.Stdin)
 	if err != nil {
