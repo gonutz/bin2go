@@ -21,12 +21,10 @@ func main() {
 	}
 
 	if *packageName != "" {
-		fmt.Printf(`package %s
-
-`, *packageName)
+		fmt.Printf("package %s\n\n", *packageName)
 	}
 
-	fmt.Printf(`var %s = []byte{`, *varName)
+	fmt.Printf("var %s = []byte{", *varName)
 
 	n, err := io.Copy(&generator{bytesInLine: maxBytesInLine}, os.Stdin)
 	if err != nil {
@@ -36,7 +34,7 @@ func main() {
 		fmt.Println()
 	}
 
-	fmt.Print(`}`)
+	fmt.Print("}")
 
 	if *packageName != "" {
 		fmt.Println()
