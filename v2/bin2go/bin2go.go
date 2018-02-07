@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -14,49 +15,82 @@ var (
 
 func main() {
 	flag.Parse()
-
-	if *varName == "" {
-		flag.Usage()
-		return
-	}
-
-	if *packageName != "" {
-		fmt.Printf("package %s\n\n", *packageName)
-	}
-
-	fmt.Printf("var %s = []byte{", *varName)
-
-	n, err := io.Copy(&generator{bytesInLine: maxBytesInLine}, os.Stdin)
+	err := generate(os.Stdin, os.Stdout, *varName, *packageName)
 	if err != nil {
+		flag.Usage()
 		panic(err)
 	}
-	if n > 0 {
-		fmt.Println()
+}
+
+func generate(in io.Reader, out io.Writer, varName, packageName string) error {
+	if varName == "" {
+		return errors.New("variable name must not be empty")
 	}
 
-	fmt.Print("}")
+	p := printer{out: out}
 
-	if *packageName != "" {
-		fmt.Println()
+	if packageName != "" {
+		p.printf("package %s\n\n", packageName)
+	}
+
+	p.printf("var %s = []byte{", varName)
+
+	n, err := io.Copy(&generator{p: &p}, in)
+	if err != nil {
+		return err
+	}
+	if n > 0 {
+		p.println()
+	}
+
+	p.print("}")
+
+	if packageName != "" {
+		p.println()
+	}
+
+	return p.err
+}
+
+type printer struct {
+	out io.Writer
+	err error
+}
+
+func (p *printer) println(a ...interface{}) {
+	p.print(a...)
+	p.print("\n")
+}
+
+func (p *printer) print(a ...interface{}) {
+	if p.err == nil {
+		_, p.err = fmt.Fprint(p.out, a...)
+	}
+}
+
+func (p *printer) printf(format string, a ...interface{}) {
+	if p.err == nil {
+		_, p.err = fmt.Fprintf(p.out, format, a...)
 	}
 }
 
 const maxBytesInLine = 12
 
 type generator struct {
-	bytesInLine int
+	p                *printer
+	availBytesInLine int
 }
 
 func (g *generator) Write(p []byte) (n int, err error) {
 	for _, b := range p {
-		if g.bytesInLine >= maxBytesInLine {
-			fmt.Print("\n\t")
-			g.bytesInLine = 0
+		if g.availBytesInLine <= 0 {
+			g.p.print("\n\t")
+			g.availBytesInLine = maxBytesInLine
 		} else {
-			fmt.Print(" ")
+			g.p.print(" ")
 		}
-		fmt.Printf("0x%02X,", b)
-		g.bytesInLine++
+		g.p.printf("0x%02X,", b)
+		g.availBytesInLine--
 	}
 	return len(p), nil
 }
