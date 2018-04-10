@@ -13,6 +13,9 @@ Usage
 
 ```
 Usage of bin2go:
+  -export
+        if true, will make the first letter of the variable name upper-case; if
+        false, use the variable name as is
   -package string
         Package name. Empty string to omit package clause. (default "main")
   -var string

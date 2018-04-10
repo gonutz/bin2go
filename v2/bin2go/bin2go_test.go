@@ -6,7 +6,7 @@ import (
 )
 
 func TestDoNotForgetTheVar(t *testing.T) {
-	err := generate(nil, nil, "", "")
+	err := generate(nil, nil, "", "", false)
 	if err == nil {
 		t.Error("error expected when variable name is empty")
 	}
@@ -15,7 +15,7 @@ func TestDoNotForgetTheVar(t *testing.T) {
 func TestEmptyInputGeneratesEmptyByteSlice(t *testing.T) {
 	checkGeneratedCode(
 		t,
-		"v", "",
+		"v", "", false,
 		[]byte{},
 		`var v = []byte{}`,
 	)
@@ -24,7 +24,7 @@ func TestEmptyInputGeneratesEmptyByteSlice(t *testing.T) {
 func TestSingleByteSliceStartsOnNewLine(t *testing.T) {
 	checkGeneratedCode(
 		t,
-		"v", "",
+		"v", "", false,
 		[]byte{0},
 		`var v = []byte{
 	0x00,
@@ -35,7 +35,7 @@ func TestSingleByteSliceStartsOnNewLine(t *testing.T) {
 func TestLinesDoNotBecomeTooLongToRead(t *testing.T) {
 	checkGeneratedCode(
 		t,
-		"v", "",
+		"v", "", false,
 		[]byte{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12},
 		`var v = []byte{
 	0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B,
@@ -47,7 +47,7 @@ func TestLinesDoNotBecomeTooLongToRead(t *testing.T) {
 func TestPackageNameMeansPackageClauseAndNewLineAtEnd(t *testing.T) {
 	checkGeneratedCode(
 		t,
-		"abc", "main",
+		"abc", "main", false,
 		[]byte{0, 1, 2},
 		`package main
 
@@ -58,9 +58,21 @@ var abc = []byte{
 	)
 }
 
-func checkGeneratedCode(t *testing.T, varName, packageName string, data []byte, expectedCode string) {
+func TestExportedVarNameHasTitleCase(t *testing.T) {
+	checkGeneratedCode(
+		t,
+		"abc", "main", true,
+		[]byte{},
+		`package main
+
+var Abc = []byte{}
+`,
+	)
+}
+
+func checkGeneratedCode(t *testing.T, varName, packageName string, export bool, data []byte, expectedCode string) {
 	var output bytes.Buffer
-	err := generate(bytes.NewReader(data), &output, varName, packageName)
+	err := generate(bytes.NewReader(data), &output, varName, packageName, export)
 	if err != nil {
 		t.Fatal(err)
 	}

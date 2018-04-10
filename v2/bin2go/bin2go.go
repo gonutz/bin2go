@@ -6,25 +6,34 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"unicode"
+	"unicode/utf8"
 )
 
 var (
 	packageName = flag.String("package", "main", "Package name. Empty string to omit package clause.")
 	varName     = flag.String("var", "", "Variable name to use. Must not be empty.")
+	export      = flag.Bool("export", false, "if true, will make the first letter of the variable name upper-case; if false, use the variable name as is")
 )
 
 func main() {
 	flag.Parse()
-	err := generate(os.Stdin, os.Stdout, *varName, *packageName)
+	err := generate(os.Stdin, os.Stdout, *varName, *packageName, *export)
 	if err != nil {
 		flag.Usage()
 		panic(err)
 	}
 }
 
-func generate(in io.Reader, out io.Writer, varName, packageName string) error {
+func generate(in io.Reader, out io.Writer, varName, packageName string, export bool) error {
 	if varName == "" {
 		return errors.New("variable name must not be empty")
+	}
+
+	if export {
+		r, size := utf8.DecodeRuneInString(varName)
+		r = unicode.ToUpper(r)
+		varName = string(r) + varName[size:]
 	}
 
 	p := printer{out: out}
